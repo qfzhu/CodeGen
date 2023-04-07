@@ -13,7 +13,7 @@ import torch
 
 from transformers import GPT2TokenizerFast
 from jaxformer.hf.codegen.modeling_codegen import CodeGenForCausalLM
-
+from human_eval.data import write_jsonl, read_problems
 
 
 ########################################################################
@@ -237,14 +237,18 @@ def main():
     # (4) sample
 
     with print_time('sampling'):
-        completion = sample(device=device, model=model, tokenizer=tokenizer, context=args.context, pad_token_id=args.pad, num_return_sequences=args.batch_size, temp=args.t, top_p=args.p, max_length_sample=args.max_length)[0]
-        truncation = truncate(completion)
+        problems = read_problems()
 
-        print('=' * 100)
-        print(completion)
-        print('=' * 100)
-        print(args.context+truncation)
-        print('=' * 100)
+        num_samples_per_task = 1
+        samples = [
+            dict(task_id=task_id, completion=truncate(sample(
+                device=device, model=model, tokenizer=tokenizer, context=problems[task_id]["prompt"],
+                pad_token_id=args.pad,
+                num_return_sequences=args.batch_size, temp=args.t, top_p=args.p, max_length_sample=args.max_length)[0]))
+            for task_id in problems
+            for _ in range(num_samples_per_task)
+        ]
+        write_jsonl("samples.jsonl", samples)
 
 
 
